@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModernBlog Admin</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    font-family: 'Inter', sans-serif;
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+    color: #242424;
+    background: #fff;
+}
+h1 { font-family: 'Playfair Display', serif; font-size: 42px; margin-bottom:10px; }
+.subtitle { color: #6b6b6b; margin-bottom: 40px; }
+input, textarea { width: 100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:6px; }
+button { padding:10px 16px; background:#1a8917; color:white; border:none; border-radius:6px; cursor:pointer; margin-right:6px; }
+button:hover { opacity:0.9; }
+.post { border-bottom:1px solid #eee; padding:30px 0; }
+.post h2 { font-family:'Playfair Display', serif; margin-bottom:8px; }
+.post small { color:#888; }
+.editor, .auth { margin-bottom:40px; }
+hr { margin:40px 0; border:none; border-top:1px solid #eee; }
+</style>
+</head>
+<body>
+
+<h1>ModernBlog</h1>
+<p class="subtitle">Read freely, but only admin can post.</p>
+
+<!-- AUTH SECTION -->
+<div id="authSection" class="auth">
+    <h3>Login or Register</h3>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+</div>
+
+<!-- EDITOR SECTION (ADMIN ONLY) -->
+<div id="editorSection" class="editor" style="display:none;">
+    <h3>Create Post (Admin Only)</h3>
+    <input type="text" id="title" placeholder="Post Title">
+    <textarea id="content" rows="5" placeholder="Write your story..."></textarea>
+    <button onclick="addPost()">Publish</button>
+    <button onclick="logout()">Logout</button>
+</div>
+
+<hr>
+
+<div id="posts"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAjz6oX0rbaEAl5edYU42sgPnONOQQS1j4",
+  authDomain: "aplek-f23f7.firebaseapp.com",
+  projectId: "aplek-f23f7",
+  storageBucket: "aplek-f23f7.firebasestorage.app",
+  messagingSenderId: "936675364467",
+  appId: "1:936675364467:web:abfd90f2afcf724f1b2406",
+  measurementId: "G-MYMVV1TSVH"
+};
+
+// Admin email
+const ADMIN_EMAIL = "aplek_@outlook.com";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const authSection = document.getElementById("authSection");
+const editorSection = document.getElementById("editorSection");
+const postsDiv = document.getElementById("posts");
+
+// Auth state
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        authSection.style.display = "none";
+        if(user.email === ADMIN_EMAIL){
+            editorSection.style.display = "block";
+        } else {
+            editorSection.style.display = "none";
+        }
+    } else {
+        authSection.style.display = "block";
+        editorSection.style.display = "none";
+    }
+});
+
+// Register
+window.register = async function() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    try { await createUserWithEmailAndPassword(auth, email, password); }
+    catch(err){ alert(err.message); }
+}
+
+// Login
+window.login = async function() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    try { await signInWithEmailAndPassword(auth, email, password); }
+    catch(err){ alert(err.message); }
+}
+
+// Logout
+window.logout = function() { signOut(auth); }
+
+// Add post (Admin only)
+window.addPost = async function() {
+    const user = auth.currentUser;
+    if(user.email !== ADMIN_EMAIL){ alert("Only admin can post."); return; }
+
+    const title = document.getElementById("title").value;
+    const content = document.getElementById("content").value;
+
+    if(!title || !content){ alert("Fill all fields."); return; }
+
+    await addDoc(collection(db, "posts"), {
+        title,
+        content,
+        author: user.email,
+        created: serverTimestamp()
+    });
+
+    document.getElementById("title").value = "";
+    document.getElementById("content").value = "";
+}
+
+// Live posts
+const q = query(collection(db, "posts"), orderBy("created", "desc"));
+onSnapshot(q, (snapshot)=>{
+    postsDiv.innerHTML = "";
+    snapshot.forEach(doc=>{
+        const post = doc.data();
+        postsDiv.innerHTML += `
+        <div class="post">
+            <h2>${post.title}</h2>
+            <small>${post.author}</small>
+            <p>${post.content}</p>
+        </div>
+        `;
+    });
+});
+</script>
+
+</body>
+</html>
